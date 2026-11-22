@@ -29,7 +29,8 @@ export class FeedbackLoopStack extends Stack {
     super(scope, id, props);
 
     // ---------------------------------------------------------------------
-    // 1. SES: sender identity + configuration set with its own suppression
+    // 1. SES: sender identity + configuration set that overrides the account-level
+    //    suppression settings (addresses still go to the account suppression list)
     // ---------------------------------------------------------------------
     new ses.EmailIdentity(this, 'SenderIdentity', {
       identity: ses.Identity.email(props.senderEmail),
@@ -83,7 +84,8 @@ export class FeedbackLoopStack extends Stack {
       }),
     });
 
-    table.grantWriteData(handler);
+    // PutItem is the only call the handler makes.
+    table.grant(handler, 'dynamodb:PutItem');
     handler.addEventSource(new SqsEventSource(queue, { batchSize: 10, reportBatchItemFailures: true }));
 
     // ---------------------------------------------------------------------
@@ -109,6 +111,8 @@ export class FeedbackLoopStack extends Stack {
         treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       }),
 
+      // Catches init errors (e.g. TABLE_NAME missing) and timeouts. Per-message failures are
+      // returned as batchItemFailures, so they don't count as Lambda errors: the DLQ alarm catches those.
       new cloudwatch.Alarm(this, 'HandlerErrorsAlarm', {
         alarmDescription: 'The suppression handler is throwing errors.',
         metric: handler.metricErrors({ period: Duration.minutes(5), statistic: 'Sum' }),
@@ -130,7 +134,7 @@ export class FeedbackLoopStack extends Stack {
         threshold: props.bounceRateThreshold ?? 0.02,
         evaluationPeriods: 1,
         comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        treatMissingData: cloudwatch.TreatMissingData.IGNORE,
       }),
 
       new cloudwatch.Alarm(this, 'ComplaintRateAlarm', {
@@ -144,7 +148,7 @@ export class FeedbackLoopStack extends Stack {
         threshold: props.complaintRateThreshold ?? 0.0005,
         evaluationPeriods: 1,
         comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        treatMissingData: cloudwatch.TreatMissingData.IGNORE,
       }),
     ];
 

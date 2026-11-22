@@ -39,3 +39,17 @@ test('there are alarms for the DLQ, handler errors and both reputation metrics',
     Threshold: 0.0005,
   });
 });
+
+test('the handler can only put items in the suppression table', () => {
+  template.hasResourceProperties('AWS::IAM::Policy', {
+    PolicyDocument: {
+      Statement: Match.arrayWith([Match.objectLike({ Action: 'dynamodb:PutItem', Effect: 'Allow' })]),
+    },
+  });
+});
+
+test('reputation alarms keep their state when SES publishes no data', () => {
+  for (const metricName of ['Reputation.BounceRate', 'Reputation.ComplaintRate']) {
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', { MetricName: metricName, TreatMissingData: 'ignore' });
+  }
+});
