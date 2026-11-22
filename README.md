@@ -60,13 +60,12 @@ After the deploy:
 ./scripts/send-test-emails.sh
 ```
 
-The script sends one email to `bounce@simulator.amazonses.com` and one to `complaint@simulator.amazonses.com` using the configuration set, waits 30 seconds and scans the suppression table. Expected result:
+The script sends one email to `bounce@simulator.amazonses.com` and one to `complaint@simulator.amazonses.com` using the configuration set, waits 30 seconds and scans the suppression table. You should see two items:
 
-```
-email                                reason     type       expiresAt
-bounce@simulator.amazonses.com       BOUNCE     Permanent  None
-complaint@simulator.amazonses.com    COMPLAINT  None       None
-```
+- `bounce@simulator.amazonses.com`: reason `BOUNCE`, type `Permanent`, no `expiresAt` (suppressed forever).
+- `complaint@simulator.amazonses.com`: reason `COMPLAINT`, no `expiresAt`.
+
+If the table is empty, check the Lambda logs and the DLQ.
 
 Mailbox simulator emails do not count toward your bounce or complaint rate.
 
